@@ -24,11 +24,11 @@ namespace MusicTypePatcher
                 .Run(args);
         }
 
-        private static IEnumerable<IModContext<TGet>> ExtentContexts<TGet>(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, FormKey formKey)
+        private static IEnumerable<IModContext<TGet>> ExtentContexts<TGet>(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, IFormLinkGetter<TGet> link)
             where TGet : class, IMajorRecordGetter
         {
             // Get every context for this musicType
-            var contexts = state.LinkCache.ResolveAllSimpleContexts<TGet>(formKey).ToArray();
+            var contexts = link.ResolveAllSimpleContexts(state.LinkCache).ToArray();
             var masters = contexts.SelectMany(i => state.LoadOrder.TryGetValue(i.ModKey)?.Mod?.MasterReferences ?? new List<IMasterReferenceGetter>(), (i, g) => g.Master)
                 .ToHashSet();
 
@@ -46,14 +46,14 @@ namespace MusicTypePatcher
             foreach (var musicType in loadOrder.PriorityOrder.OnlyEnabled().MusicType().WinningOverrides())
             {
                 Console.WriteLine("Processing MusicType {0}", musicType);
-                ProcessMusicType(state, musicType);
+                ProcessMusicType(state, musicType.ToLink());
             }
         }
 
-        private static void ProcessMusicType(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, IMusicTypeGetter musicType)
+        private static void ProcessMusicType(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, IFormLinkGetter<IMusicTypeGetter> musicType)
         {
-            var origin = state.LinkCache.Resolve<IMusicTypeGetter>(musicType.FormKey);
-            var extentContexts = ExtentContexts<IMusicTypeGetter>(state, musicType.FormKey).ToList();
+            var origin = musicType.Resolve(state.LinkCache);
+            var extentContexts = ExtentContexts(state, musicType).ToList();
             if (extentContexts.Count < 2)
             {
                 return;
