@@ -64,12 +64,12 @@ namespace MusicTypePatcher
             copy.VersionControl = Timestamp;
             copy.Tracks = new ExtendedList<IFormLinkGetter<IMusicTrackGetter>>();
 
-            var originalTracks = origin.Tracks.EmptyIfNull();
-            int originalTrackCount = originalTracks.Count();
+            var originalTracks = origin.Tracks.EmptyIfNull().ToArray();
+            int originalTrackCount = originalTracks.Length;
 
-            var extentTracks = extentContexts.Select(static i => i.Record.Tracks.EmptyIfNull());
+            var extentTracks = extentContexts.Select(static i => i.Record.Tracks.EmptyIfNull().ToArray()).ToArray();
 
-            extentTracks.Aggregate(originalTracks, (i, k) => i.Intersection(k)).ForEach(copy.Tracks.Add);
+            extentTracks.Aggregate(originalTracks, (i, k) => i.Intersection(k).ToArray()).ForEach(copy.Tracks.Add);
             copy.Tracks.AddRange(extentTracks.SelectMany(i => i.DisjunctLeft(copy.Tracks)));
 
             Console.WriteLine("Copied {0} tracks to {1}", copy.Tracks.Count - originalTrackCount, copy.EditorID);
