@@ -24,13 +24,15 @@ namespace MusicTypePatcher
                 .Run(args);
         }
 
-        private static IEnumerable<IModContext<TGet>> ExtentContexts<TGet>(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, IFormLinkGetter<TGet> link)
+        private static IEnumerable<IModContext<TGet>> ExtentContexts<TGet>(
+            IPatcherState<ISkyrimMod, ISkyrimModGetter> state,
+            IReadOnlyDictionary<ModKey, ModKey[]> masterLookup,
+            IFormLinkGetter<TGet> link)
             where TGet : class, IMajorRecordGetter
         {
             // Get every context for this musicType
             var contexts = link.ResolveAllSimpleContexts(state.LinkCache).ToArray();
-            var masters = contexts.SelectMany(i => state.LoadOrder.TryGetValue(i.ModKey)?.Mod?.MasterReferences ?? new List<IMasterReferenceGetter>(), (i, g) => g.Master)
-                .ToHashSet();
+            var masters = contexts.SelectMany(i => masterLookup.GetValueOrDefault(i.ModKey) ?? []).ToHashSet();
 
             foreach (var ctx in contexts)
             {
@@ -43,17 +45,26 @@ namespace MusicTypePatcher
         {
             using var loadOrder = state.LoadOrder;
 
+            var mastersMapping = loadOrder.ListedOrder
+                .Where(x => x.Mod != null)
+                .ToDictionary(
+                    x => x.ModKey,
+                    x => x.Mod!.MasterReferences.Select(x => x.Master).ToArray());
+
             foreach (var musicType in loadOrder.PriorityOrder.OnlyEnabled().MusicType().WinningOverrides())
             {
                 Console.WriteLine("Processing MusicType {0}", musicType);
-                ProcessMusicType(state, musicType.ToLink());
+                ProcessMusicType(state, mastersMapping, musicType.ToLink());
             }
         }
 
-        private static void ProcessMusicType(IPatcherState<ISkyrimMod, ISkyrimModGetter> state, IFormLinkGetter<IMusicTypeGetter> musicType)
+        private static void ProcessMusicType(
+            IPatcherState<ISkyrimMod, ISkyrimModGetter> state,
+            IReadOnlyDictionary<ModKey, ModKey[]> masterLookup,
+            IFormLinkGetter<IMusicTypeGetter> musicType)
         {
             var origin = musicType.Resolve(state.LinkCache);
-            var extentContexts = ExtentContexts(state, musicType).ToList();
+            var extentContexts = ExtentContexts(state, masterLookup, musicType).ToList();
             if (extentContexts.Count < 2)
             {
                 return;
